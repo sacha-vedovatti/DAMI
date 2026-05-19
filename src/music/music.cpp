@@ -7,20 +7,40 @@
 
 #include "music.hpp"
 
-int Music::run(void)
+static std::string extract_artist(const std::string &author)
 {
-    while (true) {
-        bool loaded = LoadAsync().get();
+    const char *separators[] = {" - ", " — ", " – ", " | ", " / "};
 
+    for (const char *separator : separators) {
+        size_t pos = author.find(separator);
+        if (pos != std::string::npos)
+            return author.substr(0, pos);
+    }
+    return author;
+}
+
+int Music::run(DiscordRPC &rpc)
+{
+    bool loaded = false;
+
+    while (true) {
+        rpc.callbacks();
+        loaded = LoadAsync().get();
         if (!loaded) {
             _old_title.clear();
             _old_author.clear();
+            rpc.clear();
         } else {
             if (_title != _old_title || _author != _old_author) {
                 _old_title = _title;
                 _old_author = _author;
+                _img = Cover::fetch(extract_artist(_author), _title);
+
                 std::cout << "[PLAYING] " << _title << std::endl;
                 std::cout << "\t\t" << _author << "\n" << std::endl;
+                std::cout << "[IMG] " << (_img.empty() ? "introuvable" : _img) << std::endl;
+
+                rpc.update(_title, _author, _img);
             }
         }
         std::this_thread::sleep_for(std::chrono::seconds(POLL_INTERVAL_SECONDS));

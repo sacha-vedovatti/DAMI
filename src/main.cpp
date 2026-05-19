@@ -10,7 +10,10 @@
 int main()
 {
     winrt::init_apartment();
-    Music music;
+    DiscordRPC rpc(DISCORD_CLIENT_ID);
+    if (!rpc.init())
+        return 84;
 
-    return music.run();;
+    Music music;
+    return music.run(rpc);
 }

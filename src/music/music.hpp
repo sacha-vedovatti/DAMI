@@ -7,6 +7,9 @@
 
 #pragma once
 
+#include "../cover/cover.hpp"
+#include "../rpc/discord.rpc.hpp"
+
 #include <string>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Media.Control.h>
@@ -15,10 +18,11 @@
 
 static constexpr std::wstring_view APPLE_MUSIC_APP_ID = L"AppleInc.AppleMusic";
 static constexpr int POLL_INTERVAL_SECONDS = 5;
+static constexpr discord::ClientId DISCORD_CLIENT_ID = 1506365978299207822;
 
 class Music {
     public:
-        int run(void);
+        int run(DiscordRPC &rpc);
         winrt::Windows::Foundation::IAsyncOperation<bool> LoadAsync(void);
         bool hasTrack(void) const;
 
@@ -41,6 +45,7 @@ class Music {
 
         std::string _title;
         std::string _author;
+        std::string _img;
 
         std::string _old_title;
         std::string _old_author;
