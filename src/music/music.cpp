@@ -24,7 +24,6 @@ int Music::run(DiscordRPC &rpc)
     bool loaded = false;
 
     while (true) {
-        rpc.callbacks();
         loaded = LoadAsync().get();
         if (!loaded) {
             _old_title.clear();

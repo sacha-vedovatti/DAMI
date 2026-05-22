@@ -18,7 +18,7 @@
 
 static constexpr std::wstring_view APPLE_MUSIC_APP_ID = L"AppleInc.AppleMusic";
 static constexpr int POLL_INTERVAL_SECONDS = 5;
-static constexpr discord::ClientId DISCORD_CLIENT_ID = 1506365978299207822;
+static constexpr uint64_t DISCORD_CLIENT_ID = 1506365978299207822;
 
 class Music {
     public:
