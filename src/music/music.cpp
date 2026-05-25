@@ -19,12 +19,27 @@ static std::string extract_artist(const std::string &author)
     return author;
 }
 
+static bool split_artist_album(const std::string &author, std::string &artist, std::string &album)
+{
+    const char *separators[] = {" - ", " — ", " – ", " | ", " / "};
+
+    for (const char *separator : separators) {
+        size_t pos = author.find(separator);
+        if (pos != std::string::npos) {
+            artist = author.substr(0, pos);
+            album = author.substr(pos + std::strlen(separator));
+            return true;
+        }
+    }
+    return false;
+}
+
 int Music::run(DiscordRPC &rpc)
 {
     bool loaded = false;
 
     while (true) {
-        loaded = LoadAsync().get();
+        loaded = load().get();
         if (!loaded) {
             _old_title.clear();
             _old_author.clear();
@@ -33,11 +48,13 @@ int Music::run(DiscordRPC &rpc)
             if (_title != _old_title || _author != _old_author) {
                 _old_title = _title;
                 _old_author = _author;
-                _img = Cover::fetch(extract_artist(_author), _title);
+                _img = Cover::fetch(extract_artist(_author), _title, _album);
 
-                std::cout << "[PLAYING] " << _title << std::endl;
-                std::cout << "\t\t" << _author << "\n" << std::endl;
-                std::cout << "[IMG] " << (_img.empty() ? "introuvable" : _img) << std::endl;
+                std::cout << "[PLAYING] Now playing:" << std::endl;
+                std::cout << "\tTITRE: " << _title << std::endl;
+                std::cout << "\tARTIST: " << _author << std::endl;
+                std::cout << "\tALBUM: " << _album << std::endl;
+                std::cout << "\tCOVER: " << (_img.empty() ? "introuvable" : _img) << std::endl;
 
                 rpc.update(_title, _author, _img);
             }
@@ -47,7 +64,7 @@ int Music::run(DiscordRPC &rpc)
     return 0;
 }
 
-winrt::Windows::Foundation::IAsyncOperation<bool> Music::LoadAsync(void)
+winrt::Windows::Foundation::IAsyncOperation<bool> Music::load(void)
 {
     _manager = co_await winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
     _session = _manager.GetCurrentSession();
@@ -60,6 +77,13 @@ winrt::Windows::Foundation::IAsyncOperation<bool> Music::LoadAsync(void)
         co_return _clear();
     _title = winrt::to_string(_info.Title());
     _author = winrt::to_string(_info.Artist());
+    _album = winrt::to_string(_info.AlbumTitle());
+    if (_album.empty()) {
+        std::string parsed_artist = _author;
+
+        if (split_artist_album(_author, parsed_artist, _album))
+            _author = parsed_artist;
+    }
     co_return !_title.empty() || !_author.empty();
 }
 

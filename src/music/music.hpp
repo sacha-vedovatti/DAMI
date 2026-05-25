@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "../cover/cover.hpp"
+#include "../server/server.hpp"
 #include "../rpc/discord.rpc.hpp"
 
 #include <string>
@@ -22,8 +22,11 @@ static constexpr uint64_t DISCORD_CLIENT_ID = 1506365978299207822;
 
 class Music {
     public:
+        explicit Music(Server &server);
+
         int run(DiscordRPC &rpc);
-        winrt::Windows::Foundation::IAsyncOperation<bool> LoadAsync(void);
+        winrt::Windows::Foundation::IAsyncOperation<bool> load(void);
+
         bool hasTrack(void) const;
 
         std::string getTitle(void) const;
@@ -36,6 +39,9 @@ class Music {
     private:
         bool _clear(void);
         bool _verify_source(void);
+        winrt::Windows::Foundation::IAsyncOperation<bool> _load_cover(void);
+
+        Server &_server;
 
         winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager _manager{nullptr};
         winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession _session{nullptr};
@@ -45,7 +51,7 @@ class Music {
 
         std::string _title;
         std::string _author;
-        std::string _img;
+        std::string _album;
 
         std::string _old_title;
         std::string _old_author;
