@@ -5,7 +5,7 @@
 ** Apple Music handler
 */
 
-#include "music.hpp"
+#include "Music.hpp"
 
 void Music::_exctract(void)
 {

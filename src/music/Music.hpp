@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include "../server/server.hpp"
-#include "../rpc/discord.rpc.hpp"
+#include "../server/Server.hpp"
+#include "../rpc/DiscordRPC.hpp"
 
 #include <string>
 #include <winrt/Windows.Foundation.h>

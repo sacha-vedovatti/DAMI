@@ -5,7 +5,7 @@
 ** HTTP Server
 */
 
-#include "server.hpp"
+#include "Server.hpp"
 
 Server::Server()
 {

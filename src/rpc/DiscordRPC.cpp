@@ -5,7 +5,7 @@
 ** Discord SDK Rich Presence
 */
 
-#include "discord.rpc.hpp"
+#include "DiscordRPC.hpp"
 
 DiscordRPC::DiscordRPC(uint64_t id) : _id(id) { }
 
