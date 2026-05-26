@@ -65,3 +65,57 @@ void Server::set_cover(std::vector<uint8_t> bytes, const std::string &mime)
     _bytes = std::move(bytes);
     _mime = mime;
 }
+
+std::string Server::url(void)
+{
+    return "http://127.0.0.1:" + std::to_string(_PORT) + "/cover";
+}
+
+void Server::_run(void)
+{
+    while (_running) {
+        SOCKET client = accept(_socket, nullptr, nullptr);
+
+        if (client == INVALID_SOCKET)
+            break;
+        std::thread([this, client]() {
+            _handle(client);
+            closesocket(client);
+        }).detach();
+    }
+}
+
+static void send_error(SOCKET client, const char *message)
+{
+    std::cerr << "[SERVER] [LOG] Error sent at id '" << client << "': " << message << std::endl;
+    send(client, message, (int) strlen(message), 0);
+    return;
+}
+
+void Server::_handle(SOCKET client)
+{
+    char buffer[2048];
+    int received = recv(client, buffer, sizeof(buffer) - 1, 0);
+    if (received <= 0)
+        return;
+    buffer[received] = '\0';
+
+    std::string request(buffer);
+    bool has_cover = (req.find("GET /cover") != std::string::npos);
+    if (!has_cover)
+        return send_error(client, "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";)
+
+    std::vector<uint8_t> data;
+    std::string mime;
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+        data = _bytes;
+        mime = _mime;
+    }
+    if (data.empty())
+        return send_error(client, "HTTP/1.1 204 No Content\r\nConnection: close\r\n\r\n");
+
+    std::string header = "HTTP/1.1 200 OK\r\nContent-Type: " + mime + "\r\nContent-Length: " + std::to_string(data.size()) + "\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n";
+    send(client, header.data(), (int) header.size(), 0);
+    send(client, (const char *) data.data(), (int) data.size(), 0);
+}

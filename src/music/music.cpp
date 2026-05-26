@@ -7,36 +7,30 @@
 
 #include "music.hpp"
 
-static std::string extract_artist(const std::string &author)
+void Music::_exctract(void)
 {
+    std::string parsed_artist, parsed_album;
+    size_t sep_pos = std::string::npos;
     const char *separators[] = {" - ", " — ", " – ", " | ", " / "};
 
-    for (const char *separator : separators) {
-        size_t pos = author.find(separator);
-        if (pos != std::string::npos)
-            return author.substr(0, pos);
-    }
-    return author;
-}
-
-static bool split_artist_album(const std::string &author, std::string &artist, std::string &album)
-{
-    const char *separators[] = {" - ", " — ", " – ", " | ", " / "};
-
-    for (const char *separator : separators) {
-        size_t pos = author.find(separator);
-        if (pos != std::string::npos) {
-            artist = author.substr(0, pos);
-            album = author.substr(pos + std::strlen(separator));
-            return true;
+    for (const char *sep : separators) {
+        sep_pos = _author.find(sep);
+        if (sep_pos != std::string::npos) {
+            parsed_artist = _author.substr(0, sep_pos);
+            parsed_album  = _author.substr(sep_pos + std::strlen(sep));
+            _author = parsed_artist;
+            _album  = parsed_album;
+            break;
         }
     }
-    return false;
 }
+
+Music::Music(Server &server) : _server {}
 
 int Music::run(DiscordRPC &rpc)
 {
     bool loaded = false;
+    bool has_cover = false;
 
     while (true) {
         loaded = load().get();
@@ -48,15 +42,15 @@ int Music::run(DiscordRPC &rpc)
             if (_title != _old_title || _author != _old_author) {
                 _old_title = _title;
                 _old_author = _author;
-                _img = Cover::fetch(extract_artist(_author), _title, _album);
+                has_cover = _load_cover().get();
 
                 std::cout << "[PLAYING] Now playing:" << std::endl;
                 std::cout << "\tTITRE: " << _title << std::endl;
                 std::cout << "\tARTIST: " << _author << std::endl;
                 std::cout << "\tALBUM: " << _album << std::endl;
-                std::cout << "\tCOVER: " << (_img.empty() ? "introuvable" : _img) << std::endl;
+                std::cout << "\tCOVER: " << (has_cover ? Server::url() : "[NOT_FOUND]") << std::endl;
 
-                rpc.update(_title, _author, _img);
+                rpc.update(_title, _author, has_cover ? Server::url() : "");
             }
         }
         std::this_thread::sleep_for(std::chrono::seconds(POLL_INTERVAL_SECONDS));
@@ -78,12 +72,8 @@ winrt::Windows::Foundation::IAsyncOperation<bool> Music::load(void)
     _title = winrt::to_string(_info.Title());
     _author = winrt::to_string(_info.Artist());
     _album = winrt::to_string(_info.AlbumTitle());
-    if (_album.empty()) {
-        std::string parsed_artist = _author;
-
-        if (split_artist_album(_author, parsed_artist, _album))
-            _author = parsed_artist;
-    }
+    if (_album.empty())
+        _extract();
     co_return !_title.empty() || !_author.empty();
 }
 

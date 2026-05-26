@@ -39,6 +39,7 @@ class Music {
     private:
         bool _clear(void);
         bool _verify_source(void);
+        void _exctract(void);
         winrt::Windows::Foundation::IAsyncOperation<bool> _load_cover(void);
 
         Server &_server;

@@ -29,7 +29,7 @@ class Server {
         static std::string url(void);
 
     private:
-        void _serve(void);
+        void _run(void);
         void _handle(SOCKET client);
         bool _error(void);
 
