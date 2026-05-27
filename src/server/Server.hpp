@@ -13,9 +13,14 @@
 #include <mutex>
 #include <atomic>
 #include <cstdint>
-#include <windows.h>
+
+#ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+#endif
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <windows.h>
 #include <iostream>
 
 class Server {
@@ -26,7 +31,7 @@ class Server {
         bool start(void);
         void set_cover(std::vector<uint8_t> bytes, const std::string &mime);
 
-        static std::string url(void);
+        std::string url(void);
 
     private:
         void _run(void);

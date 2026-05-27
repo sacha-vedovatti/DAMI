@@ -53,7 +53,7 @@ bool Server::start(void)
     if (listen(_socket, SOMAXCONN) == SOCKET_ERROR)
         return _error();
     _running = true;
-    _thread = std::thread(&Server::_serve, this);
+    _thread = std::thread(&Server::_run, this);
     std::cout << "[SERVER] Listening on " << url() << std::endl;
     return true;
 }
@@ -74,7 +74,7 @@ std::string Server::url(void)
 void Server::_run(void)
 {
     while (_running) {
-        SOCKET client = accept(_socket, nullptr, nullptr);
+        SOCKET client = accept(_socket, (sockaddr *) nullptr, (int *) nullptr);
 
         if (client == INVALID_SOCKET)
             break;
@@ -89,7 +89,6 @@ static void send_error(SOCKET client, const char *message)
 {
     std::cerr << "[SERVER] [LOG] Error sent at id '" << client << "': " << message << std::endl;
     send(client, message, (int) strlen(message), 0);
-    return;
 }
 
 void Server::_handle(SOCKET client)
@@ -101,9 +100,12 @@ void Server::_handle(SOCKET client)
     buffer[received] = '\0';
 
     std::string request(buffer);
-    bool has_cover = (req.find("GET /cover") != std::string::npos);
-    if (!has_cover)
-        return send_error(client, "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";)
+    bool has_cover = (request.find("GET /cover") != std::string::npos);
+    if (!has_cover) {
+        std::cerr << "[SERVER] [LOG] Unhandled request from id '" << client << "':\n" << request << std::endl;
+        send_error(client, "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        return;
+    }
 
     std::vector<uint8_t> data;
     std::string mime;
