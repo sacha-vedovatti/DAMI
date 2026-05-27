@@ -3,14 +3,16 @@ project(DAMI)
 
 set(CMAKE_CXX_STANDARD 20)
 
+file(GLOB_RECURSE SRC_FILES
+    "src/*.cpp"
+)
+
 add_executable(DAMI
-	src/main.cpp
-	src/cover/cover.cpp
-	src/rpc/discord.rpc.cpp
-	src/music/music.cpp
+    ${SRC_FILES}
 )
 
 target_link_libraries(DAMI
 	windowsapp
 	winhttp
+	ws2_32
 )
