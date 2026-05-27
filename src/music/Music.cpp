@@ -9,32 +9,17 @@
 
 uint64_t load_config(const std::string &configPath)
 {
-    std::ifstream file(configPath);
-    if (!file.is_open()) {
-        std::cerr << "[CONFIG] Error: Could not open " << configPath << std::endl;
-        return 0;
-    }
+    const char* env_client_id = std::getenv("DISCORD_CLIENT_ID");
 
-    std::string line = "";
-    while (std::getline(file, line)) {
-        size_t pos = line.find("\"client_id\"");
-        if (pos != std::string::npos) {
-            pos = line.find(":", pos);
-            if (pos != std::string::npos) {
-                std::string value_str = line.substr(pos + 1);
-                value_str.erase(0, value_str.find_first_not_of(" \t,"));
-                value_str.erase(value_str.find_last_not_of(" \t,") + 1);
-                try {
-                    return std::stoull(value_str);
-                } catch (...) {
-                    std::cerr << "[CONFIG] Error: Invalid client_id value" << std::endl;
-                    return 0;
-                }
-            }
+    if (env_client_id) {
+        try {
+            return std::stoull(env_client_id);
+        } catch (...) {
+            std::cerr << "[CONFIG] Error: Invalid DISCORD_CLIENT_ID env var" << std::endl;
         }
+    } else {
+        std::cerr << "[CONFIG] Error: no env variable" << std::endl;
     }
-    std::cerr << "[CONFIG] Error: client_id not found in config" << std::endl;
-    return 0;
 }
 
 void Music::_extract(void)
