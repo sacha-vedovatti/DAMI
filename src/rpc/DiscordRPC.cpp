@@ -114,7 +114,14 @@ static std::string json_escape(const std::string &string)
     return result;
 }
 
-std::string DiscordRPC::_build_payload(const std::string &title, const std::string &artist, const std::string &img_url)
+static std::string ensure_min_length(const std::string &str, size_t min_len = 2)
+{
+    if (str.length() >= min_len)
+        return str;
+    return str + std::string(min_len - str.length(), ' ');
+}
+
+std::string DiscordRPC::_build_payload(const std::string &title, const std::string &artist, const std::string &album, const std::string &img_url)
 {
     std::ostringstream json;
 
@@ -125,11 +132,11 @@ std::string DiscordRPC::_build_payload(const std::string &title, const std::stri
        <<     "\"pid\":" << GetCurrentProcessId() << ","
        <<     "\"activity\":{"
        <<       "\"type\":2,"
-       <<       "\"details\":\"" << json_escape(title)  << "\","
-       <<       "\"state\":\""   << json_escape(artist) << "\","
+       <<       "\"details\":\"" << json_escape(ensure_min_length(title))  << "\","
+       <<       "\"state\":\""   << json_escape(ensure_min_length(artist)) << "\","
        <<       "\"assets\":{"
        <<         "\"large_image\":\"" << json_escape(img_url) << "\","
-       <<         "\"large_text\":\""  << json_escape(title)   << "\","
+       <<         "\"large_text\":\""  << json_escape(album)   << "\","
        <<         "\"small_image\":\"apple_music\","
        <<         "\"small_text\":\"Apple Music\""
        <<       "}"
@@ -140,10 +147,10 @@ std::string DiscordRPC::_build_payload(const std::string &title, const std::stri
     return json.str();
 }
 
-void DiscordRPC::update(const std::string &title, const std::string &artist, const std::string &img_url)
+void DiscordRPC::update(const std::string &title, const std::string &artist, const std::string &album, const std::string &img_url)
 {
     const std::string &image = img_url.empty() ? "apple_music" : img_url;
-    const std::string payload = _build_payload(title, artist, image);
+    const std::string payload = _build_payload(title, artist, album, image);
 
     if (!_send(1, payload)) {
         std::cerr << "[DISCORD] Send failed, attempting reconnect..." << std::endl;

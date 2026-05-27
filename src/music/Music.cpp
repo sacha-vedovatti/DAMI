@@ -41,7 +41,7 @@ void Music::_extract(void)
 {
     std::string parsed_artist, parsed_album;
     size_t sep_pos = std::string::npos;
-    const char *separators[] = {" - ", " — ", " – ", " | ", " / "};
+    const char *separators[] = {" — ", " – "};
 
     for (const char *sep : separators) {
         sep_pos = _author.find(sep);
@@ -81,7 +81,7 @@ int Music::run(DiscordRPC &rpc)
                 std::cout << "\tALBUM: "  << _album  << std::endl;
                 std::cout << "\tCOVER: "  << (has_cover ? _cover_url : "[NOT_FOUND]") << std::endl;
 
-                rpc.update(_title, _author, has_cover ? _cover_url : "");
+                rpc.update(_title, _author, _album, has_cover ? _cover_url : "");
             }
         }
         std::this_thread::sleep_for(std::chrono::seconds(POLL_INTERVAL_SECONDS));
