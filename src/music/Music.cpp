@@ -47,10 +47,33 @@ void Music::_extract(void)
 
 Music::Music(Server &server) : _server(server) { }
 
+void Music::_update(DiscordRPC &rpc, bool &has_cover, bool &old_playing)
+{
+    bool track_changed = (_title != _old_title || _author != _old_author);
+    bool state_changed = (_is_playing != old_playing);
+
+    if (track_changed) {
+        _old_title = _title;
+        _old_author = _author;
+        has_cover = _load_cover().get();
+
+        std::cout << "[PLAYING] Now playing:" << std::endl;
+        std::cout << "\tTITRE: "  << _title  << std::endl;
+        std::cout << "\tARTIST: " << _author << std::endl;
+        std::cout << "\tALBUM: "  << _album  << std::endl;
+        std::cout << "\tCOVER: "  << (has_cover ? _cover_url : "[NOT_FOUND]") << std::endl;
+    }
+    if (track_changed || state_changed) {
+        old_playing = _is_playing;
+        rpc.update({_title, _author, _album, has_cover ? _cover_url : "", _start, _end});
+    }
+}
+
 int Music::run(DiscordRPC &rpc)
 {
-    bool loaded = false;
     bool has_cover = false;
+    bool old_playing = false;
+    bool loaded = false;
 
     while (true) {
         loaded = load().get();
@@ -59,21 +82,8 @@ int Music::run(DiscordRPC &rpc)
             _old_author.clear();
             _cover_url.clear();
             rpc.clear();
-        } else {
-            if (_title != _old_title || _author != _old_author) {
-                _old_title = _title;
-                _old_author = _author;
-                has_cover = _load_cover().get();
-
-                std::cout << "[PLAYING] Now playing:" << std::endl;
-                std::cout << "\tTITRE: "  << _title  << std::endl;
-                std::cout << "\tARTIST: " << _author << std::endl;
-                std::cout << "\tALBUM: "  << _album  << std::endl;
-                std::cout << "\tCOVER: "  << (has_cover ? _cover_url : "[NOT_FOUND]") << std::endl;
-
-                rpc.update({_title, _author, _album, has_cover ? _cover_url : "", _start, _end});
-            }
-        }
+        } else
+            _update(rpc, has_cover, old_playing);
         std::this_thread::sleep_for(std::chrono::seconds(POLL_INTERVAL_SECONDS));
     }
     return 0;

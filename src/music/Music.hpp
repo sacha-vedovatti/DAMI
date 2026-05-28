@@ -44,14 +44,15 @@ class Music {
         std::string getSource(void) const;
     private:
         bool _clear(void);
+        void _update(DiscordRPC &rpc, bool &has_cover, bool &old_playing);
         bool _verify_source(void);
+        void _get_timestamp(void);
         void _extract(void);
         winrt::Windows::Foundation::IAsyncOperation<bool> _load_cover(void);
         std::string _upload(const std::vector<uint8_t> &bytes, const std::string &mime);
         std::string _build(const std::vector<uint8_t> &bytes, const std::string &mime, const std::string &boundary);
         std::string _send_to_catbox(const std::string &body, const std::string &boundary);
         bool _validate(const std::string &response);
-        void _get_timestamp(void);
 
         Server &_server;
 
