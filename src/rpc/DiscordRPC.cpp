@@ -121,22 +121,32 @@ static std::string ensure_min_length(const std::string &str, size_t min_len = 2)
     return str + std::string(min_len - str.length(), ' ');
 }
 
-std::string DiscordRPC::_build_payload(const std::string &title, const std::string &artist, const std::string &album, const std::string &img_url)
+std::string DiscordRPC::_build_payload(const TrackInfo &track)
 {
     std::ostringstream json;
+    const std::string &image = track.img_url.empty() ? DISCORD_APP_ASSET_KEY : track.img_url;
 
     _nonce++;
-    json << "{"
+     json << "{"
        <<   "\"cmd\":\"SET_ACTIVITY\","
        <<   "\"args\":{"
        <<     "\"pid\":" << GetCurrentProcessId() << ","
        <<     "\"activity\":{"
        <<       "\"type\":2,"
-       <<       "\"details\":\"" << json_escape(ensure_min_length(title))  << "\","
-       <<       "\"state\":\""   << json_escape(ensure_min_length(artist)) << "\","
-       <<       "\"assets\":{"
-       <<         "\"large_image\":\"" << json_escape(img_url) << "\","
-       <<         "\"large_text\":\""  << json_escape(album)   << "\","
+       <<       "\"details\":\"" << json_escape(ensure_min_length(track.title))  << "\","
+       <<       "\"state\":\""   << json_escape(ensure_min_length(track.artist)) << "\",";
+
+    if (track.start > 0) {
+        json << "\"timestamps\":{"
+             <<   "\"start\":" << track.start;
+        if (track.end > track.start)
+            json << ",\"end\":" << track.end;
+        json << "},";
+    }
+
+    json <<       "\"assets\":{"
+       <<         "\"large_image\":\"" << json_escape(track.img_url) << "\","
+       <<         "\"large_text\":\""  << json_escape(track.album)   << "\","
        <<         "\"small_image\":\"apple_music\","
        <<         "\"small_text\":\"Apple Music\""
        <<       "}"
@@ -147,10 +157,9 @@ std::string DiscordRPC::_build_payload(const std::string &title, const std::stri
     return json.str();
 }
 
-void DiscordRPC::update(const std::string &title, const std::string &artist, const std::string &album, const std::string &img_url)
+void DiscordRPC::update(const TrackInfo &track)
 {
-    const std::string &image = img_url.empty() ? "apple_music" : img_url;
-    const std::string payload = _build_payload(title, artist, album, image);
+    const std::string payload = _build_payload(track);
 
     if (!_send(1, payload)) {
         std::cerr << "[DISCORD] Send failed, attempting reconnect..." << std::endl;

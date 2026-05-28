@@ -51,6 +51,7 @@ class Music {
         std::string _build(const std::vector<uint8_t> &bytes, const std::string &mime, const std::string &boundary);
         std::string _send_to_catbox(const std::string &body, const std::string &boundary);
         bool _validate(const std::string &response);
+        void _get_timestamp(void);
 
         Server &_server;
 
@@ -67,4 +68,8 @@ class Music {
 
         std::string _old_title;
         std::string _old_author;
+
+        bool _is_playing = false;
+        int64_t _start = 0;
+        int64_t _end = 0;
 };

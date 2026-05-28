@@ -18,21 +18,29 @@
 
 static constexpr const char *DISCORD_APP_ASSET_KEY = "apple_music";
 
+struct TrackInfo {
+    std::string title;
+    std::string artist;
+    std::string album;
+    std::string img_url;
+    int64_t start;
+    int64_t end;
+};
+
 class DiscordRPC {
     public:
         DiscordRPC(uint64_t id);
         ~DiscordRPC();
 
         bool init(void);
-        void update(const std::string &title, const std::string &artist, const std::string &album, const std::string &img_url);
+        void update(const TrackInfo &track);
         void clear(void);
-        // void callbacks(void);
 
     private:
         bool _connect(void);
         bool _send(int opcode, const std::string &payload);
         bool _handshake(void);
-        std::string _build_payload(const std::string &title, const std::string &artist, const std::string &album, const std::string &img_url);
+        std::string _build_payload(const TrackInfo &track);
 
         uint64_t _id;
         HANDLE _pipe{INVALID_HANDLE_VALUE};
