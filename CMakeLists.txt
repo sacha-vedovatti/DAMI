@@ -16,3 +16,9 @@ target_link_libraries(DAMI
 	winhttp
 	ws2_32
 )
+
+if(DEFINED ENV{DISCORD_CLIENT_ID})
+    add_compile_definitions(COMPILED_DISCORD_CLIENT_ID=$ENV{DISCORD_CLIENT_ID})
+else()
+    message(WARNING "DISCORD_CLIENT_ID not set, will use config.json fallback")
+endif()

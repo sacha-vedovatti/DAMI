@@ -9,17 +9,22 @@
 
 uint64_t load_config(const std::string &configPath)
 {
-    const char* env_client_id = std::getenv("DISCORD_CLIENT_ID");
 
+    #ifdef COMPILED_DISCORD_CLIENT_ID
+        return COMPILED_DISCORD_CLIENT_ID;
+    #endif
+
+    const char* env_client_id = std::getenv("DISCORD_CLIENT_ID");
     if (env_client_id) {
         try {
             return std::stoull(env_client_id);
         } catch (...) {
             std::cerr << "[CONFIG] Error: Invalid DISCORD_CLIENT_ID env var" << std::endl;
+            return 0;
         }
-    } else {
-        std::cerr << "[CONFIG] Error: no env variable" << std::endl;
     }
+    std::cerr << "[CONFIG] Error: DISCORD_CLIENT_ID not provided (env / compiled) and config file missing/invalid" << std::endl;
+    return 0;
 }
 
 void Music::_extract(void)
