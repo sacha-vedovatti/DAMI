@@ -20,11 +20,10 @@
 #include <winhttp.h>
 #include <fstream>
 #include <sstream>
+#include <iomanip>
 
 static constexpr std::wstring_view APPLE_MUSIC_APP_ID = L"AppleInc.AppleMusic";
 static constexpr int POLL_INTERVAL_SECONDS = 5;
-
-uint64_t load_config(const std::string &configPath = "config.json");
 
 class Music {
     public:
@@ -43,16 +42,21 @@ class Music {
 
         std::string getSource(void) const;
     private:
+        /* METHODS */
+
+        void _print(bool has_image);
         bool _clear(void);
         void _update(DiscordRPC &rpc, bool &has_cover, bool &old_playing);
         bool _verify_source(void);
         void _get_timestamp(void);
         void _extract(void);
-        winrt::Windows::Foundation::IAsyncOperation<bool> _load_cover(void);
+        bool _validate(const std::string &response);
         std::string _upload(const std::vector<uint8_t> &bytes, const std::string &mime);
         std::string _build(const std::vector<uint8_t> &bytes, const std::string &mime, const std::string &boundary);
         std::string _send_to_catbox(const std::string &body, const std::string &boundary);
-        bool _validate(const std::string &response);
+        winrt::Windows::Foundation::IAsyncOperation<bool> _load_cover(void);
+
+        /* ATTRIBUTES */
 
         Server &_server;
 
@@ -61,11 +65,11 @@ class Music {
         winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties _info{nullptr};
 
         std::string _source;
-        std::string _cover_url;
-
         std::string _title;
         std::string _author;
         std::string _album;
+        std::string _cover_url;
+        std::string _track_url;
 
         std::string _old_title;
         std::string _old_author;

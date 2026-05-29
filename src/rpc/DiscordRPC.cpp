@@ -124,17 +124,17 @@ static std::string ensure_min_length(const std::string &str, size_t min_len = 2)
 std::string DiscordRPC::_build_payload(const TrackInfo &track)
 {
     std::ostringstream json;
-    const std::string &image = track.img_url.empty() ? DISCORD_APP_ASSET_KEY : track.img_url;
+    const std::string &image = track.image.empty() ? DISCORD_APP_ASSET_KEY : track.image;
 
     _nonce++;
-     json << "{"
-       <<   "\"cmd\":\"SET_ACTIVITY\","
-       <<   "\"args\":{"
-       <<     "\"pid\":" << GetCurrentProcessId() << ","
-       <<     "\"activity\":{"
-       <<       "\"type\":2,"
-       <<       "\"details\":\"" << json_escape(ensure_min_length(track.title))  << "\","
-       <<       "\"state\":\""   << json_escape(ensure_min_length(track.artist)) << "\",";
+    json << "{"
+        <<   "\"cmd\":\"SET_ACTIVITY\","
+        <<   "\"args\":{"
+        <<     "\"pid\":" << GetCurrentProcessId() << ","
+        <<     "\"activity\":{"
+        <<       "\"type\":2,"
+        <<       "\"details\":\"" << json_escape(ensure_min_length(track.title))  << "\","
+        << "\"state\":\"" << json_escape(ensure_min_length(track.artist)) << "\",";
 
     if (track.start > 0) {
         json << "\"timestamps\":{"
@@ -144,16 +144,16 @@ std::string DiscordRPC::_build_payload(const TrackInfo &track)
         json << "},";
     }
 
-    json <<       "\"assets\":{"
-       <<         "\"large_image\":\"" << json_escape(track.img_url) << "\","
-       <<         "\"large_text\":\""  << json_escape(track.album)   << "\","
-       <<         "\"small_image\":\"apple_music\","
-       <<         "\"small_text\":\"Apple Music\""
-       <<       "}"
-       <<     "}"
-       <<   "},"
-       <<   "\"nonce\":\"" << _nonce << "\""
-       << "}";
+    json << "\"assets\":{"
+        <<         "\"large_image\":\"" << json_escape(image) << "\"," 
+        <<         "\"large_text\":\""  << json_escape(track.album)   << "\""
+    //  <<         "\"small_image\":\"apple_music\","
+    //  <<         "\"small_text\":\"Apple Music\""
+        <<       "}"
+        <<     "}"
+        <<   "},"
+        <<   "\"nonce\":\"" << _nonce << "\""
+        << "}";
     return json.str();
 }
 

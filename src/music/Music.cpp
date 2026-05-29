@@ -47,7 +47,16 @@ void Music::_extract(void)
 
 Music::Music(Server &server) : _server(server) { }
 
-void Music::_update(DiscordRPC &rpc, bool &has_cover, bool &old_playing)
+void Music::_print(bool has_image)
+{
+    std::cout << "[PLAYING] Now playing:" << std::endl;
+    std::cout << "\tTITRE: "  << _title  << std::endl;
+    std::cout << "\tARTIST: " << _author << std::endl;
+    std::cout << "\tALBUM: "  << _album  << std::endl;
+    std::cout << "\tCOVER: "  << (has_image ? _cover_url : "[NOT_FOUND]") << std::endl;
+}
+
+void Music::_update(DiscordRPC &rpc, bool &has_image, bool &old_playing)
 {
     bool track_changed = (_title != _old_title || _author != _old_author);
     bool state_changed = (_is_playing != old_playing);
@@ -55,23 +64,18 @@ void Music::_update(DiscordRPC &rpc, bool &has_cover, bool &old_playing)
     if (track_changed) {
         _old_title = _title;
         _old_author = _author;
-        has_cover = _load_cover().get();
-
-        std::cout << "[PLAYING] Now playing:" << std::endl;
-        std::cout << "\tTITRE: "  << _title  << std::endl;
-        std::cout << "\tARTIST: " << _author << std::endl;
-        std::cout << "\tALBUM: "  << _album  << std::endl;
-        std::cout << "\tCOVER: "  << (has_cover ? _cover_url : "[NOT_FOUND]") << std::endl;
+        has_image = _load_cover().get();
+        _print(has_image);
     }
     if (track_changed || state_changed) {
         old_playing = _is_playing;
-        rpc.update({_title, _author, _album, has_cover ? _cover_url : "", _start, _end});
+        rpc.update({_title, _author, _album, has_image ? _cover_url : "", _start, _end});
     }
 }
 
 int Music::run(DiscordRPC &rpc)
 {
-    bool has_cover = false;
+    bool has_image = false;
     bool old_playing = false;
     bool loaded = false;
 
@@ -83,7 +87,7 @@ int Music::run(DiscordRPC &rpc)
             _cover_url.clear();
             rpc.clear();
         } else
-            _update(rpc, has_cover, old_playing);
+            _update(rpc, has_image, old_playing);
         std::this_thread::sleep_for(std::chrono::seconds(POLL_INTERVAL_SECONDS));
     }
     return 0;

@@ -15,6 +15,7 @@
 #include <windows.h>
 #include <cstring>
 #include <sstream>
+#include <vector>
 
 static constexpr const char *DISCORD_APP_ASSET_KEY = "apple_music";
 
@@ -22,9 +23,9 @@ struct TrackInfo {
     std::string title;
     std::string artist;
     std::string album;
-    std::string img_url;
-    int64_t start;
-    int64_t end;
+    std::string image;
+    int64_t start = 0;
+    int64_t end = 0;
 };
 
 class DiscordRPC {
