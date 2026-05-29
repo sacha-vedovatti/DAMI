@@ -2,10 +2,10 @@ name: Build
 
 on:
   push:
-    path:
+    paths:
       - 'src/**'
   pull_request:
-    path:
+    paths:
       - 'src/**'
 
 jobs:
