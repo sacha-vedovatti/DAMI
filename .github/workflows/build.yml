@@ -2,7 +2,11 @@ name: Build
 
 on:
   push:
+    path:
+      - 'src/**'
   pull_request:
+    path:
+      - 'src/**'
 
 jobs:
   build:
