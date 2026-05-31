@@ -1,0 +1,8 @@
+{
+    "show_title": true,
+    "show_artist": true,
+    "show_album": true,
+    "show_cover": true,
+    "show_timestamps": true,
+    "start_with_windows": false
+}
