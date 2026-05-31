@@ -47,10 +47,37 @@ void Music::_extract(void)
 
 Music::Music(Server &server) : _server(server) { }
 
+void Music::_print(bool has_image)
+{
+    std::cout << "[PLAYING] Now playing:" << std::endl;
+    std::cout << "\tTITRE: "  << _title  << std::endl;
+    std::cout << "\tARTIST: " << _author << std::endl;
+    std::cout << "\tALBUM: "  << _album  << std::endl;
+    std::cout << "\tCOVER: "  << (has_image ? _cover_url : "[NOT_FOUND]") << std::endl;
+}
+
+void Music::_update(DiscordRPC &rpc, bool &has_image, bool &old_playing)
+{
+    bool track_changed = (_title != _old_title || _author != _old_author);
+    bool state_changed = (_is_playing != old_playing);
+
+    if (track_changed) {
+        _old_title = _title;
+        _old_author = _author;
+        has_image = _load_cover().get();
+        _print(has_image);
+    }
+    if (track_changed || state_changed) {
+        old_playing = _is_playing;
+        rpc.update({_title, _author, _album, has_image ? _cover_url : "", _start, _end});
+    }
+}
+
 int Music::run(DiscordRPC &rpc)
 {
+    bool has_image = false;
+    bool old_playing = false;
     bool loaded = false;
-    bool has_cover = false;
 
     while (true) {
         loaded = load().get();
@@ -59,21 +86,8 @@ int Music::run(DiscordRPC &rpc)
             _old_author.clear();
             _cover_url.clear();
             rpc.clear();
-        } else {
-            if (_title != _old_title || _author != _old_author) {
-                _old_title = _title;
-                _old_author = _author;
-                has_cover = _load_cover().get();
-
-                std::cout << "[PLAYING] Now playing:" << std::endl;
-                std::cout << "\tTITRE: "  << _title  << std::endl;
-                std::cout << "\tARTIST: " << _author << std::endl;
-                std::cout << "\tALBUM: "  << _album  << std::endl;
-                std::cout << "\tCOVER: "  << (has_cover ? _cover_url : "[NOT_FOUND]") << std::endl;
-
-                rpc.update(_title, _author, _album, has_cover ? _cover_url : "");
-            }
-        }
+        } else
+            _update(rpc, has_image, old_playing);
         std::this_thread::sleep_for(std::chrono::seconds(POLL_INTERVAL_SECONDS));
     }
     return 0;
@@ -95,7 +109,30 @@ winrt::Windows::Foundation::IAsyncOperation<bool> Music::load(void)
     _album = winrt::to_string(_info.AlbumTitle());
     if (_album.empty())
         _extract();
+    _get_timestamp();
     co_return !_title.empty() || !_author.empty();
+}
+
+void Music::_get_timestamp(void)
+{
+    auto playback = _session.GetPlaybackInfo();
+    _is_playing = (playback && playback.PlaybackStatus() == winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
+    _start = 0;
+    _end = 0;
+    if (!_is_playing)
+        return;
+
+    auto timeline = _session.GetTimelineProperties();
+    if (timeline) {
+        using namespace std::chrono;
+        int64_t pos = duration_cast<seconds>(timeline.Position()).count();
+        int64_t end_time = duration_cast<seconds>(timeline.EndTime()).count();
+        int64_t time = static_cast<int64_t>(std::time(nullptr));
+
+        _start = time - pos;
+        if (end_time > pos)
+            _end = _start + end_time;
+    }
 }
 
 std::string Music::_build(const std::vector<uint8_t> &bytes, const std::string &mime, const std::string &boundary)
