@@ -9,6 +9,7 @@
 
 #include "../server/Server.hpp"
 #include "../rpc/DiscordRPC.hpp"
+#include "../config/Config.hpp"
 
 #include <string>
 #include <vector>
@@ -27,10 +28,11 @@ static constexpr int POLL_INTERVAL_SECONDS = 5;
 
 class Music {
     public:
-        explicit Music(Server &server);
+        explicit Music(Server &server, const config_t &config);
 
-        int run(DiscordRPC &rpc);
         winrt::Windows::Foundation::IAsyncOperation<bool> load(void);
+        void update(DiscordRPC &rpc);
+        void clear_cache(void);
 
         bool hasTrack(void) const;
 
@@ -46,7 +48,6 @@ class Music {
 
         void _print(bool has_image);
         bool _clear(void);
-        void _update(DiscordRPC &rpc, bool &has_cover, bool &old_playing);
         bool _verify_source(void);
         void _get_timestamp(void);
         void _extract(void);
@@ -59,6 +60,7 @@ class Music {
         /* ATTRIBUTES */
 
         Server &_server;
+        const config_t &_config;
 
         winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager _manager{nullptr};
         winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession _session{nullptr};
@@ -69,12 +71,13 @@ class Music {
         std::string _author;
         std::string _album;
         std::string _cover_url;
-        std::string _track_url;
+        int64_t _start = 0;
+        int64_t _end = 0;
 
         std::string _old_title;
         std::string _old_author;
 
         bool _is_playing = false;
-        int64_t _start = 0;
-        int64_t _end = 0;
+        bool _tmp_playing = false;
+        bool _has_cover = false;
 };

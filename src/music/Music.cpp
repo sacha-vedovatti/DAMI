@@ -7,24 +7,13 @@
 
 #include "Music.hpp"
 
-uint64_t load_config(const std::string &configPath)
+Music::Music(Server &server, const config_t &conf) : _server(server), _config(conf) { }
+
+void Music::clear_cache(void)
 {
-
-    #ifdef COMPILED_DISCORD_CLIENT_ID
-        return COMPILED_DISCORD_CLIENT_ID;
-    #endif
-
-    const char* env_client_id = std::getenv("DISCORD_CLIENT_ID");
-    if (env_client_id) {
-        try {
-            return std::stoull(env_client_id);
-        } catch (...) {
-            std::cerr << "[CONFIG] Error: Invalid DISCORD_CLIENT_ID env var" << std::endl;
-            return 0;
-        }
-    }
-    std::cerr << "[CONFIG] Error: DISCORD_CLIENT_ID not provided (env / compiled) and config file missing/invalid" << std::endl;
-    return 0;
+    _cover_url.clear();
+    _has_cover = false;
+    _server.set_cover({}, "");
 }
 
 void Music::_extract(void)
@@ -45,8 +34,6 @@ void Music::_extract(void)
     }
 }
 
-Music::Music(Server &server) : _server(server) { }
-
 void Music::_print(bool has_image)
 {
     std::cout << "[PLAYING] Now playing:" << std::endl;
@@ -56,41 +43,34 @@ void Music::_print(bool has_image)
     std::cout << "\tCOVER: "  << (has_image ? _cover_url : "[NOT_FOUND]") << std::endl;
 }
 
-void Music::_update(DiscordRPC &rpc, bool &has_image, bool &old_playing)
+void Music::update(DiscordRPC &rpc)
 {
     bool track_changed = (_title != _old_title || _author != _old_author);
-    bool state_changed = (_is_playing != old_playing);
+    bool state_changed = (_is_playing != _tmp_playing);
 
     if (track_changed) {
-        _old_title = _title;
+        _old_title  = _title;
         _old_author = _author;
-        has_image = _load_cover().get();
-        _print(has_image);
+        if (_config.show_cover)
+            _has_cover = _load_cover().get();
+        else
+            _has_cover = false;
+        _print(_has_cover);
     }
     if (track_changed || state_changed) {
-        old_playing = _is_playing;
-        rpc.update({_title, _author, _album, has_image ? _cover_url : "", _start, _end});
+        _tmp_playing = _is_playing;
+        TrackInfo info {
+            _config.show_title  ? _title  : "",
+            _config.show_artist ? _author : "",
+            _config.show_album  ? _album  : "",
+            (_config.show_cover && _has_cover) ? _cover_url : "",
+        };
+        if (_config.show_timestamps) {
+            info.start = _start;
+            info.end   = _end;
+        }
+        rpc.update(info);
     }
-}
-
-int Music::run(DiscordRPC &rpc)
-{
-    bool has_image = false;
-    bool old_playing = false;
-    bool loaded = false;
-
-    while (true) {
-        loaded = load().get();
-        if (!loaded) {
-            _old_title.clear();
-            _old_author.clear();
-            _cover_url.clear();
-            rpc.clear();
-        } else
-            _update(rpc, has_image, old_playing);
-        std::this_thread::sleep_for(std::chrono::seconds(POLL_INTERVAL_SECONDS));
-    }
-    return 0;
 }
 
 winrt::Windows::Foundation::IAsyncOperation<bool> Music::load(void)
