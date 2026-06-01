@@ -180,9 +180,37 @@ std::string Music::_send_to_catbox(const std::string &body, const std::string &b
     return response;
 }
 
+static bool is_valid_catbox_url(const std::string &response)
+{
+    static const std::string prefix = "https://";
+    static const std::string host = "files.catbox.moe";
+    if (response.rfind(prefix, 0) != 0)
+        return false;
+
+    const size_t host_begin = prefix.size();
+    const size_t host_end = response.find('/', host_begin);
+    if (host_end == std::string::npos || response.compare(host_begin, host_end - host_begin, host) != 0)
+        return false;
+
+    const size_t path_begin = host_end;
+    if (path_begin >= response.size() || response[path_begin] != '/')
+        return false;
+    if (response.find_first_of("?#", path_begin) != std::string::npos)
+        return false;
+    if (response.find('/', path_begin + 1) != std::string::npos)
+        return false;
+    for (size_t i = path_begin + 1; i < response.size(); i++) {
+        unsigned char c = static_cast<unsigned char>(response[i]);
+        bool allowed = std::isalnum(c) || c == '.' || c == '_' || c == '-';
+        if (!allowed)
+            return false;
+    }
+    return (response.size() > path_begin + 1);
+}
+
 bool Music::_validate(const std::string &response)
 {
-    if (response.rfind("https://files.catbox.moe/", 0) != 0) {
+    if (!is_valid_catbox_url(response)) {
         std::cerr << "[COVER] catbox.moe unexpected response: " << response << std::endl;
         return false;
     }
@@ -198,6 +226,17 @@ std::string Music::_upload(const std::vector<uint8_t> &bytes, const std::string 
     if (!_validate(response))
         return "";
     return response;
+}
+
+static std::string detect_image_mime(const std::vector<uint8_t> &bytes)
+{
+    if (bytes.size() >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 && bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A)
+        return "image/png";
+    if (bytes.size() >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+        return "image/jpeg";
+    if (bytes.size() >= 12 && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F' && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P')
+        return "image/webp";
+    return "";
 }
 
 winrt::Windows::Foundation::IAsyncOperation<bool> Music::_load_cover(void)
@@ -222,8 +261,6 @@ winrt::Windows::Foundation::IAsyncOperation<bool> Music::_load_cover(void)
     if (size == 0 || size > 10 * 1024 * 1024)
         co_return false;
 
-    std::string mime = "image/jpeg";
-
     auto input = stream.GetInputStreamAt(0);
     winrt::Windows::Storage::Streams::DataReader reader(input);
     try {
@@ -234,12 +271,15 @@ winrt::Windows::Foundation::IAsyncOperation<bool> Music::_load_cover(void)
 
     std::vector<uint8_t> bytes(static_cast<size_t>(size));
     reader.ReadBytes(bytes);
+
+    std::string mime = detect_image_mime(bytes);
+    if (mime.empty())
+        co_return false;
     _server.set_cover(bytes, mime);
 
     std::string url = _upload(bytes, mime);
     if (url.empty())
         co_return false;
-
     _cover_url = url;
     co_return true;
 }
