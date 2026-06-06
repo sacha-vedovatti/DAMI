@@ -7,24 +7,13 @@
 
 #include "Music.hpp"
 
-uint64_t load_config(const std::string &configPath)
+Music::Music(Server &server, const config_t &conf) : _server(server), _config(conf) { }
+
+void Music::clear_cache(void)
 {
-
-    #ifdef COMPILED_DISCORD_CLIENT_ID
-        return COMPILED_DISCORD_CLIENT_ID;
-    #endif
-
-    const char* env_client_id = std::getenv("DISCORD_CLIENT_ID");
-    if (env_client_id) {
-        try {
-            return std::stoull(env_client_id);
-        } catch (...) {
-            std::cerr << "[CONFIG] Error: Invalid DISCORD_CLIENT_ID env var" << std::endl;
-            return 0;
-        }
-    }
-    std::cerr << "[CONFIG] Error: DISCORD_CLIENT_ID not provided (env / compiled) and config file missing/invalid" << std::endl;
-    return 0;
+    _cover_url.clear();
+    _has_cover = false;
+    _server.set_cover({}, "");
 }
 
 void Music::_extract(void)
@@ -45,8 +34,6 @@ void Music::_extract(void)
     }
 }
 
-Music::Music(Server &server) : _server(server) { }
-
 void Music::_print(bool has_image)
 {
     std::cout << "[PLAYING] Now playing:" << std::endl;
@@ -56,52 +43,52 @@ void Music::_print(bool has_image)
     std::cout << "\tCOVER: "  << (has_image ? _cover_url : "[NOT_FOUND]") << std::endl;
 }
 
-void Music::_update(DiscordRPC &rpc, bool &has_image, bool &old_playing)
+void Music::update(DiscordRPC &rpc)
 {
     bool track_changed = (_title != _old_title || _author != _old_author);
-    bool state_changed = (_is_playing != old_playing);
+    bool state_changed = (_is_playing != _tmp_playing);
 
     if (track_changed) {
-        _old_title = _title;
+        _old_title  = _title;
         _old_author = _author;
-        has_image = _load_cover().get();
-        _print(has_image);
+        if (_config.show_cover)
+            _has_cover = _load_cover().get();
+        else
+            _has_cover = false;
+        _print(_has_cover);
     }
     if (track_changed || state_changed) {
-        old_playing = _is_playing;
-        rpc.update({_title, _author, _album, has_image ? _cover_url : "", _start, _end});
+        _tmp_playing = _is_playing;
+        TrackInfo info {
+            _config.show_title  ? _title  : "",
+            _config.show_artist ? _author : "",
+            _config.show_album  ? _album  : "",
+            (_config.show_cover && _has_cover) ? _cover_url : "",
+        };
+        if (_config.show_timestamps) {
+            info.start = _start;
+            info.end   = _end;
+        }
+        rpc.update(info);
     }
-}
-
-int Music::run(DiscordRPC &rpc)
-{
-    bool has_image = false;
-    bool old_playing = false;
-    bool loaded = false;
-
-    while (true) {
-        loaded = load().get();
-        if (!loaded) {
-            _old_title.clear();
-            _old_author.clear();
-            _cover_url.clear();
-            rpc.clear();
-        } else
-            _update(rpc, has_image, old_playing);
-        std::this_thread::sleep_for(std::chrono::seconds(POLL_INTERVAL_SECONDS));
-    }
-    return 0;
 }
 
 winrt::Windows::Foundation::IAsyncOperation<bool> Music::load(void)
 {
-    _manager = co_await winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
-    _session = _manager.GetCurrentSession();
-    if (!_session)
+    try {
+        _manager = co_await winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
+    } catch (...) {
         co_return _clear();
-    if (!_verify_source())
+    }
+
+    if (!_select_session())
         co_return _clear();
-    _info = co_await _session.TryGetMediaPropertiesAsync();
+
+    try {
+        _info = co_await _session.TryGetMediaPropertiesAsync();
+    } catch (...) {
+        co_return _clear();
+    }
     if (!_info)
         co_return _clear();
     _title = winrt::to_string(_info.Title());
@@ -200,9 +187,37 @@ std::string Music::_send_to_catbox(const std::string &body, const std::string &b
     return response;
 }
 
+static bool is_valid_catbox_url(const std::string &response)
+{
+    static const std::string prefix = "https://";
+    static const std::string host = "files.catbox.moe";
+    if (response.rfind(prefix, 0) != 0)
+        return false;
+
+    const size_t host_begin = prefix.size();
+    const size_t host_end = response.find('/', host_begin);
+    if (host_end == std::string::npos || response.compare(host_begin, host_end - host_begin, host) != 0)
+        return false;
+
+    const size_t path_begin = host_end;
+    if (path_begin >= response.size() || response[path_begin] != '/')
+        return false;
+    if (response.find_first_of("?#", path_begin) != std::string::npos)
+        return false;
+    if (response.find('/', path_begin + 1) != std::string::npos)
+        return false;
+    for (size_t i = path_begin + 1; i < response.size(); i++) {
+        unsigned char c = static_cast<unsigned char>(response[i]);
+        bool allowed = std::isalnum(c) || c == '.' || c == '_' || c == '-';
+        if (!allowed)
+            return false;
+    }
+    return (response.size() > path_begin + 1);
+}
+
 bool Music::_validate(const std::string &response)
 {
-    if (response.rfind("https://files.catbox.moe/", 0) != 0) {
+    if (!is_valid_catbox_url(response)) {
         std::cerr << "[COVER] catbox.moe unexpected response: " << response << std::endl;
         return false;
     }
@@ -218,6 +233,17 @@ std::string Music::_upload(const std::vector<uint8_t> &bytes, const std::string 
     if (!_validate(response))
         return "";
     return response;
+}
+
+static std::string detect_image_mime(const std::vector<uint8_t> &bytes)
+{
+    if (bytes.size() >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 && bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A)
+        return "image/png";
+    if (bytes.size() >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+        return "image/jpeg";
+    if (bytes.size() >= 12 && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F' && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P')
+        return "image/webp";
+    return "";
 }
 
 winrt::Windows::Foundation::IAsyncOperation<bool> Music::_load_cover(void)
@@ -242,8 +268,6 @@ winrt::Windows::Foundation::IAsyncOperation<bool> Music::_load_cover(void)
     if (size == 0 || size > 10 * 1024 * 1024)
         co_return false;
 
-    std::string mime = "image/jpeg";
-
     auto input = stream.GetInputStreamAt(0);
     winrt::Windows::Storage::Streams::DataReader reader(input);
     try {
@@ -254,12 +278,15 @@ winrt::Windows::Foundation::IAsyncOperation<bool> Music::_load_cover(void)
 
     std::vector<uint8_t> bytes(static_cast<size_t>(size));
     reader.ReadBytes(bytes);
+
+    std::string mime = detect_image_mime(bytes);
+    if (mime.empty())
+        co_return false;
     _server.set_cover(bytes, mime);
 
     std::string url = _upload(bytes, mime);
     if (url.empty())
         co_return false;
-
     _cover_url = url;
     co_return true;
 }
@@ -309,4 +336,44 @@ bool Music::_verify_source(void)
 
     _source = winrt::to_string(app_id);
     return app_id.starts_with(APPLE_MUSIC_APP_ID);
+}
+
+bool Music::_is_apple_music_session(const winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession &session)
+{
+    if (!session)
+        return false;
+    return session.SourceAppUserModelId().starts_with(APPLE_MUSIC_APP_ID);
+}
+
+bool Music::_select_session(void)
+{
+    auto current = _manager.GetCurrentSession();
+    if (_is_apple_music_session(current)) {
+        _session = current;
+        return _verify_source();
+    }
+
+    auto sessions = _manager.GetSessions();
+    winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession fallback{nullptr};
+
+    for (uint32_t i = 0; i < sessions.Size(); i++) {
+        auto session = sessions.GetAt(i);
+        if (!_is_apple_music_session(session))
+            continue;
+
+        if (!fallback)
+            fallback = session;
+
+        auto playback = session.GetPlaybackInfo();
+        if (playback && playback.PlaybackStatus() == winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing) {
+            _session = session;
+            return _verify_source();
+        }
+    }
+
+    if (fallback) {
+        _session = fallback;
+        return _verify_source();
+    }
+    return false;
 }
