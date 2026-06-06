@@ -75,13 +75,20 @@ void Music::update(DiscordRPC &rpc)
 
 winrt::Windows::Foundation::IAsyncOperation<bool> Music::load(void)
 {
-    _manager = co_await winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
-    _session = _manager.GetCurrentSession();
-    if (!_session)
+    try {
+        _manager = co_await winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
+    } catch (...) {
         co_return _clear();
-    if (!_verify_source())
+    }
+
+    if (!_select_session())
         co_return _clear();
-    _info = co_await _session.TryGetMediaPropertiesAsync();
+
+    try {
+        _info = co_await _session.TryGetMediaPropertiesAsync();
+    } catch (...) {
+        co_return _clear();
+    }
     if (!_info)
         co_return _clear();
     _title = winrt::to_string(_info.Title());
@@ -329,4 +336,44 @@ bool Music::_verify_source(void)
 
     _source = winrt::to_string(app_id);
     return app_id.starts_with(APPLE_MUSIC_APP_ID);
+}
+
+bool Music::_is_apple_music_session(const winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession &session)
+{
+    if (!session)
+        return false;
+    return session.SourceAppUserModelId().starts_with(APPLE_MUSIC_APP_ID);
+}
+
+bool Music::_select_session(void)
+{
+    auto current = _manager.GetCurrentSession();
+    if (_is_apple_music_session(current)) {
+        _session = current;
+        return _verify_source();
+    }
+
+    auto sessions = _manager.GetSessions();
+    winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession fallback{nullptr};
+
+    for (uint32_t i = 0; i < sessions.Size(); i++) {
+        auto session = sessions.GetAt(i);
+        if (!_is_apple_music_session(session))
+            continue;
+
+        if (!fallback)
+            fallback = session;
+
+        auto playback = session.GetPlaybackInfo();
+        if (playback && playback.PlaybackStatus() == winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing) {
+            _session = session;
+            return _verify_source();
+        }
+    }
+
+    if (fallback) {
+        _session = fallback;
+        return _verify_source();
+    }
+    return false;
 }

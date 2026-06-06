@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Media.Control.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/base.h>
@@ -49,6 +50,8 @@ class Music {
         void _print(bool has_image);
         bool _clear(void);
         bool _verify_source(void);
+        bool _is_apple_music_session(const winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession &session);
+        bool _select_session(void);
         void _get_timestamp(void);
         void _extract(void);
         bool _validate(const std::string &response);
