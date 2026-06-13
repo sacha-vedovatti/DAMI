@@ -34,16 +34,6 @@ class Music {
         winrt::Windows::Foundation::IAsyncOperation<bool> load(void);
         void update(DiscordRPC &rpc);
         void clear_cache(void);
-
-        bool hasTrack(void) const;
-
-        std::string getTitle(void) const;
-        void setTitle(std::string &title);
-
-        std::string getAuthor(void) const;
-        void setAuthor(std::string &author);
-
-        std::string getSource(void) const;
     private:
         /* METHODS */
 
@@ -69,7 +59,6 @@ class Music {
         winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession _session{nullptr};
         winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties _info{nullptr};
 
-        std::string _source;
         std::string _title;
         std::string _author;
         std::string _album;

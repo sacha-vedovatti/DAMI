@@ -291,41 +291,12 @@ winrt::Windows::Foundation::IAsyncOperation<bool> Music::_load_cover(void)
     co_return true;
 }
 
-std::string Music::getTitle(void) const
-{
-    return _title;
-}
 
-void Music::setTitle(std::string &title)
-{
-    _title = title;
-}
-
-std::string Music::getAuthor(void) const
-{
-    return _author;
-}
-
-void Music::setAuthor(std::string &author)
-{
-    _author = author;
-}
-
-std::string Music::getSource(void) const
-{
-    return _source;
-}
-
-bool Music::hasTrack(void) const
-{
-    return !_title.empty() || !_author.empty();
-}
 
 bool Music::_clear(void)
 {
     _title.clear();
     _author.clear();
-    _source.clear();
     _album.clear();
     return false;
 }
@@ -333,8 +304,6 @@ bool Music::_clear(void)
 bool Music::_verify_source(void)
 {
     auto app_id = _session.SourceAppUserModelId();
-
-    _source = winrt::to_string(app_id);
     return app_id.starts_with(APPLE_MUSIC_APP_ID);
 }
 
