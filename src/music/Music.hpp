@@ -31,12 +31,12 @@ class Music {
     public:
         explicit Music(Server &server, const config_t &config);
 
+        bool init(void);
         winrt::Windows::Foundation::IAsyncOperation<bool> load(void);
         void update(DiscordRPC &rpc);
         void clear_cache(void);
     private:
         /* METHODS */
-
         void _print(bool has_image);
         bool _clear(void);
         bool _verify_source(void);

@@ -9,6 +9,14 @@
 
 Music::Music(Server &server, const config_t &conf) : _server(server), _config(conf) { }
 
+bool Music::init(void)
+{
+    auto op = winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
+
+    _manager = op.get();
+    return _manager != nullptr;
+}
+
 void Music::clear_cache(void)
 {
     _cover_url.clear();
@@ -75,15 +83,10 @@ void Music::update(DiscordRPC &rpc)
 
 winrt::Windows::Foundation::IAsyncOperation<bool> Music::load(void)
 {
-    try {
-        _manager = co_await winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
-    } catch (...) {
+    if (!_manager)
         co_return _clear();
-    }
-
     if (!_select_session())
         co_return _clear();
-
     try {
         _info = co_await _session.TryGetMediaPropertiesAsync();
     } catch (...) {
