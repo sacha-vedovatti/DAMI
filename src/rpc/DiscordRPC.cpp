@@ -11,11 +11,9 @@ DiscordRPC::DiscordRPC(uint64_t id) : _id(id) { }
 
 DiscordRPC::~DiscordRPC()
 {
-    if (_pipe != INVALID_HANDLE_VALUE) {
+    if (_pipe != INVALID_HANDLE_VALUE)
         clear();
-        CloseHandle(_pipe);
-        _pipe = INVALID_HANDLE_VALUE;
-    }
+    _disconnect();
 }
 
 bool DiscordRPC::_connect(void)
@@ -26,15 +24,33 @@ bool DiscordRPC::_connect(void)
         if (_pipe != INVALID_HANDLE_VALUE)
             return true;
     }
-    std::cerr << "[DISCORD] Could not connect to Discord pipe." << std::endl;
     return false;
+}
+
+void DiscordRPC::_disconnect(void)
+{
+    if (_pipe != INVALID_HANDLE_VALUE) {
+        CloseHandle(_pipe);
+        _pipe = INVALID_HANDLE_VALUE;
+    }
+}
+
+bool DiscordRPC::_reconnect(void)
+{
+    if (!_connect())
+        return false;
+    if (!_handshake()) {
+        _disconnect();
+        return false;
+    }
+    return true;
 }
 
 bool DiscordRPC::_send(int opcode, const std::string &payload)
 {
     if (_pipe == INVALID_HANDLE_VALUE)
         return false;
-    
+
     uint32_t op = static_cast<uint32_t>(opcode);
     uint32_t len = static_cast<uint32_t>(payload.size());
     std::string frame(8 + len, '\0');
@@ -44,19 +60,25 @@ bool DiscordRPC::_send(int opcode, const std::string &payload)
 
     DWORD written = 0;
     if (!WriteFile(_pipe, frame.data(), static_cast<DWORD>(frame.size()), &written, nullptr)) {
-        std::cerr << "[DISCORD] WriteFile failed: " << GetLastError() << std::endl;
+        _disconnect();
         return false;
     }
 
     char header[8] = {};
     DWORD bytes = 0;
-    ReadFile(_pipe, header, 8, &bytes, nullptr);
+    if (!ReadFile(_pipe, header, 8, &bytes, nullptr)) {
+        _disconnect();
+        return false;
+    }
     if (bytes == 8) {
         uint32_t response = 0;
         std::memcpy(&response, &header[4], 4);
         if (response > 0 && response < 65536) {
             std::string body(response, '\0');
-            ReadFile(_pipe, &body[0], response, &bytes, nullptr);
+            if (!ReadFile(_pipe, &body[0], response, &bytes, nullptr)) {
+                _disconnect();
+                return false;
+            }
         }
     }
     return true;
@@ -72,17 +94,20 @@ bool DiscordRPC::_handshake(void)
 
 bool DiscordRPC::init(void)
 {
-    if (!_connect())
-        return false;
-    if (!_handshake())
-        return false;
-    std::cout << "[DISCORD] IPC connected." << std::endl;
-    return true;
+    return _reconnect();
+}
+
+void DiscordRPC::tick(void)
+{
+    if (_pipe != INVALID_HANDLE_VALUE)
+        return;
+    if (_reconnect() && !_last_payload.empty())
+        _send(1, _last_payload);
 }
 
 static std::string json_escape(const std::string &string)
 {
-    std::string result = "";
+    std::string result;
 
     result.reserve(string.size());
     for (unsigned char c : string) {
@@ -107,8 +132,9 @@ static std::string json_escape(const std::string &string)
                     char buffer[8];
                     std::snprintf(buffer, sizeof(buffer), "\\u%04x", c);
                     result += buffer;
-                } else
+                } else {
                     result += static_cast<char>(c);
+                }
         }
     }
     return result;
@@ -128,48 +154,40 @@ std::string DiscordRPC::_build_payload(const TrackInfo &track)
 
     _nonce++;
     json << "{"
-        <<   "\"cmd\":\"SET_ACTIVITY\","
-        <<   "\"args\":{"
-        <<     "\"pid\":" << GetCurrentProcessId() << ","
-        <<     "\"activity\":{"
-        <<       "\"type\":2,"
-        <<       "\"details\":\"" << json_escape(ensure_min_length(track.title))  << "\","
-        << "\"state\":\"" << json_escape(ensure_min_length(track.artist)) << "\",";
+         <<   "\"cmd\":\"SET_ACTIVITY\"," 
+         <<   "\"args\":{" 
+         <<     "\"pid\":" << GetCurrentProcessId() << ","
+         <<     "\"activity\":{" 
+         <<       "\"type\":2,"
+         <<       "\"details\":\"" << json_escape(ensure_min_length(track.title)) << "\"," 
+         <<       "\"state\":\"" << json_escape(ensure_min_length(track.artist)) << "\",";
 
     if (track.start > 0) {
-        json << "\"timestamps\":{"
+        json << "\"timestamps\":{" 
              <<   "\"start\":" << track.start;
         if (track.end > track.start)
             json << ",\"end\":" << track.end;
         json << "},";
     }
 
-    json << "\"assets\":{"
-        <<         "\"large_image\":\"" << json_escape(image) << "\"," 
-        <<         "\"large_text\":\""  << json_escape(track.album)   << "\""
-    //  <<         "\"small_image\":\"apple_music\","
-    //  <<         "\"small_text\":\"Apple Music\""
-        <<       "}"
-        <<     "}"
-        <<   "},"
-        <<   "\"nonce\":\"" << _nonce << "\""
-        << "}";
+    json << "\"assets\":{" 
+         <<         "\"large_image\":\"" << json_escape(image) << "\"," 
+         <<         "\"large_text\":\"" << json_escape(track.album) << "\""
+         <<       "}"
+         <<     "}"
+         <<   "},"
+         <<   "\"nonce\":\"" << _nonce << "\""
+         << "}";
     return json.str();
 }
 
 void DiscordRPC::update(const TrackInfo &track)
 {
     const std::string payload = _build_payload(track);
+    _last_payload = payload;
 
-    if (!_send(1, payload)) {
-        std::cerr << "[DISCORD] Send failed, attempting reconnect..." << std::endl;
-        if (_pipe != INVALID_HANDLE_VALUE) {
-            CloseHandle(_pipe);
-            _pipe = INVALID_HANDLE_VALUE;
-        }
-        if (_connect() && _handshake())
-            _send(1, payload);
-    }
+    if (!_send(1, payload))
+        _disconnect();
 }
 
 void DiscordRPC::clear(void)
@@ -177,8 +195,9 @@ void DiscordRPC::clear(void)
     std::ostringstream json;
 
     _nonce++;
+    _last_payload.clear();
     json << "{"
-         <<   "\"cmd\":\"SET_ACTIVITY\","
+         <<   "\"cmd\":\"SET_ACTIVITY\"," 
          <<   "\"args\":{\"pid\":" << GetCurrentProcessId() << ",\"activity\":null},"
          <<   "\"nonce\":\"" << _nonce << "\""
          << "}";

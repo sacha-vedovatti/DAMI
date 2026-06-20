@@ -31,22 +31,12 @@ class Music {
     public:
         explicit Music(Server &server, const config_t &config);
 
+        bool init(void);
         winrt::Windows::Foundation::IAsyncOperation<bool> load(void);
         void update(DiscordRPC &rpc);
         void clear_cache(void);
-
-        bool hasTrack(void) const;
-
-        std::string getTitle(void) const;
-        void setTitle(std::string &title);
-
-        std::string getAuthor(void) const;
-        void setAuthor(std::string &author);
-
-        std::string getSource(void) const;
     private:
         /* METHODS */
-
         void _print(bool has_image);
         bool _clear(void);
         bool _verify_source(void);
@@ -69,16 +59,18 @@ class Music {
         winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSession _session{nullptr};
         winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionMediaProperties _info{nullptr};
 
-        std::string _source;
         std::string _title;
         std::string _author;
         std::string _album;
         std::string _cover_url;
         int64_t _start = 0;
         int64_t _end = 0;
+        int64_t _position = 0;
+        int64_t _duration = 0;
 
         std::string _old_title;
         std::string _old_author;
+        int64_t _old_position = -1;
 
         bool _is_playing = false;
         bool _tmp_playing = false;

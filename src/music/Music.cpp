@@ -9,6 +9,14 @@
 
 Music::Music(Server &server, const config_t &conf) : _server(server), _config(conf) { }
 
+bool Music::init(void)
+{
+    auto op = winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
+
+    _manager = op.get();
+    return _manager != nullptr;
+}
+
 void Music::clear_cache(void)
 {
     _cover_url.clear();
@@ -47,18 +55,33 @@ void Music::update(DiscordRPC &rpc)
 {
     bool track_changed = (_title != _old_title || _author != _old_author);
     bool state_changed = (_is_playing != _tmp_playing);
+    bool seek_detected = false;
 
+    if (_is_playing && !track_changed && _old_position >= 0) {
+        int64_t expected = _old_position + static_cast<int64_t>(POLL_INTERVAL_SECONDS);
+        int64_t drift = std::abs(_position - expected);
+        seek_detected = (drift > static_cast<int64_t>(POLL_INTERVAL_SECONDS) + 3);
+    }
     if (track_changed) {
-        _old_title  = _title;
+        _old_title = _title;
         _old_author = _author;
+        _old_position = -1;
         if (_config.show_cover)
             _has_cover = _load_cover().get();
         else
             _has_cover = false;
         _print(_has_cover);
     }
-    if (track_changed || state_changed) {
+    if (!_is_playing) {
+        if (_tmp_playing)
+            rpc.clear();
+        _tmp_playing = false;
+        _old_position = _position;
+        return;
+    }
+    if (track_changed || state_changed || seek_detected) {
         _tmp_playing = _is_playing;
+        _old_position = _position;
         TrackInfo info {
             _config.show_title  ? _title  : "",
             _config.show_artist ? _author : "",
@@ -66,8 +89,10 @@ void Music::update(DiscordRPC &rpc)
             (_config.show_cover && _has_cover) ? _cover_url : "",
         };
         if (_config.show_timestamps) {
-            info.start = _start;
-            info.end   = _end;
+            if (_is_playing) {
+                info.start = _start;
+                info.end = _end;
+            }
         }
         rpc.update(info);
     }
@@ -75,15 +100,10 @@ void Music::update(DiscordRPC &rpc)
 
 winrt::Windows::Foundation::IAsyncOperation<bool> Music::load(void)
 {
-    try {
-        _manager = co_await winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager::RequestAsync();
-    } catch (...) {
+    if (!_manager)
         co_return _clear();
-    }
-
     if (!_select_session())
         co_return _clear();
-
     try {
         _info = co_await _session.TryGetMediaPropertiesAsync();
     } catch (...) {
@@ -106,19 +126,19 @@ void Music::_get_timestamp(void)
     _is_playing = (playback && playback.PlaybackStatus() == winrt::Windows::Media::Control::GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
     _start = 0;
     _end = 0;
-    if (!_is_playing)
-        return;
+    _position = 0;
+    _duration = 0;
 
     auto timeline = _session.GetTimelineProperties();
-    if (timeline) {
-        using namespace std::chrono;
-        int64_t pos = duration_cast<seconds>(timeline.Position()).count();
-        int64_t end_time = duration_cast<seconds>(timeline.EndTime()).count();
-        int64_t time = static_cast<int64_t>(std::time(nullptr));
-
-        _start = time - pos;
-        if (end_time > pos)
-            _end = _start + end_time;
+    if (!timeline)
+        return;
+    _position = std::chrono::duration_cast<std::chrono::seconds>(timeline.Position()).count();
+    _duration = std::chrono::duration_cast<std::chrono::seconds>(timeline.EndTime()).count();
+    if (_is_playing) {
+        int64_t now = static_cast<int64_t>(std::time(nullptr));
+        _start = now - _position;
+        if (_duration > _position)
+            _end = _start + _duration;
     }
 }
 
@@ -291,41 +311,10 @@ winrt::Windows::Foundation::IAsyncOperation<bool> Music::_load_cover(void)
     co_return true;
 }
 
-std::string Music::getTitle(void) const
-{
-    return _title;
-}
-
-void Music::setTitle(std::string &title)
-{
-    _title = title;
-}
-
-std::string Music::getAuthor(void) const
-{
-    return _author;
-}
-
-void Music::setAuthor(std::string &author)
-{
-    _author = author;
-}
-
-std::string Music::getSource(void) const
-{
-    return _source;
-}
-
-bool Music::hasTrack(void) const
-{
-    return !_title.empty() || !_author.empty();
-}
-
 bool Music::_clear(void)
 {
     _title.clear();
     _author.clear();
-    _source.clear();
     _album.clear();
     return false;
 }
@@ -333,8 +322,6 @@ bool Music::_clear(void)
 bool Music::_verify_source(void)
 {
     auto app_id = _session.SourceAppUserModelId();
-
-    _source = winrt::to_string(app_id);
     return app_id.starts_with(APPLE_MUSIC_APP_ID);
 }
 

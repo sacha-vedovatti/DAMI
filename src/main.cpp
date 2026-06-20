@@ -27,7 +27,9 @@ static void music_thread(config_t *config)
         return;
 
     Music music(server, *config);
+    music.init();
     while (running.load()) {
+        rpc.tick();
         bool loaded = music.load().get();
         if (!loaded) {
             music.clear_cache();
