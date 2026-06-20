@@ -65,9 +65,12 @@ class Music {
         std::string _cover_url;
         int64_t _start = 0;
         int64_t _end = 0;
+        int64_t _position = 0;
+        int64_t _duration = 0;
 
         std::string _old_title;
         std::string _old_author;
+        int64_t _old_position = -1;
 
         bool _is_playing = false;
         bool _tmp_playing = false;
