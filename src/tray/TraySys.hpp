@@ -16,7 +16,8 @@
 #include <string>
 #include <functional>
 
-#include "../config/Config.hpp"
+#include "config/Config.hpp"
+#include "ui/Gui.hpp"
 
 #define WM_TRAY_ICON (WM_USER + 1)
 #define ID_TRAY_ICON 1001
@@ -29,18 +30,17 @@ class TraySys {
         ~TraySys();
 
         bool init(void);
-        int  run(void);
+        int run(void);
         void set_tooltip(const std::wstring &text);
 
     private:
         bool _register(void);
         static LRESULT CALLBACK _proc(HWND hwnd, UINT message, WPARAM param, LPARAM long_param);
         void _show_context_menu(void);
-        void _show_settings(void);
-        void _update(void);
         bool _error(const std::string &err);
 
         Config &_config;
+        GUI _gui;
         HINSTANCE _instance;
         HWND _hwnd{nullptr};
         NOTIFYICONDATAW _nid{};

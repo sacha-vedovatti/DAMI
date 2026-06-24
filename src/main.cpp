@@ -61,7 +61,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int)
         CloseHandle(mutex);
         return 84;
     }
- 
+
     int ret = tray.run();
     running = false;
     if (music.joinable())

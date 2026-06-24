@@ -6,9 +6,8 @@
 */
 
 #include "TraySys.hpp"
-#include "../settings/Settings.hpp"
 
-TraySys::TraySys(Config &config, HINSTANCE instance) : _config(config), _instance(instance)
+TraySys::TraySys(Config &config, HINSTANCE instance) : _config(config), _gui(config), _instance(instance)
 {
     tray = this;
 }
@@ -18,11 +17,14 @@ TraySys::~TraySys()
     Shell_NotifyIconW(NIM_DELETE, &_nid);
     if (_hwnd)
         DestroyWindow(_hwnd);
+    _gui.join();
     tray = nullptr;
 }
 
 bool TraySys::init(void)
 {
+    if (!_gui.init())
+        return _error("GUI init failed");
     if (!_register())
         return false;
     _hwnd = CreateWindowExW(0, L"DAMI_TrayClass", L"DAMI", 0, 0, 0, 0, 0, HWND_MESSAGE, nullptr, _instance, nullptr);
@@ -96,12 +98,6 @@ void TraySys::_show_context_menu(void)
     DestroyMenu(menu);
 }
 
-void TraySys::_show_settings(void)
-{
-    Settings settings(_config, _instance, _hwnd);
-    settings.show();
-}
-
 LRESULT CALLBACK TraySys::_proc(HWND hwnd, UINT message, WPARAM param, LPARAM long_param)
 {
     if (!tray)
@@ -109,12 +105,15 @@ LRESULT CALLBACK TraySys::_proc(HWND hwnd, UINT message, WPARAM param, LPARAM lo
     switch (message) {
         case WM_TRAY_ICON:
             switch (LOWORD(long_param)) {
+                case WM_LBUTTONUP:
+                    tray->_gui.toggle();
+                    break;
                 case WM_RBUTTONUP:
                 case NIN_KEYSELECT:
                     tray->_show_context_menu();
                     break;
                 case WM_LBUTTONDBLCLK:
-                    tray->_show_settings();
+                    tray->_gui.toggle();;
                     break;
             }
             break;
@@ -124,7 +123,7 @@ LRESULT CALLBACK TraySys::_proc(HWND hwnd, UINT message, WPARAM param, LPARAM lo
         case WM_COMMAND:
             switch (LOWORD(param)) {
                 case ID_MENU_SETTINGS:
-                    tray->_show_settings();
+                    tray->_gui.toggle();
                     break;
                 case ID_MENU_QUIT:
                     Shell_NotifyIconW(NIM_DELETE, &tray->_nid);

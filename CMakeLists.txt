@@ -5,23 +5,48 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-file(GLOB_RECURSE SRC_FILES
-    "src/*.cpp"
+set(SRC_FILES
+    src/main.cpp
+    src/config/Config.cpp
+    src/music/Music.cpp
+    src/rpc/DiscordRPC.cpp
+    src/server/Server.cpp
+    src/tray/TraySys.cpp
+    src/ui/Gui.cpp
+    src/ui/theme.cpp
+)
+
+add_subdirectory(external/glfw)
+
+set(IMGUI_SRC
+    external/imgui/imgui.cpp
+    external/imgui/imgui_draw.cpp
+    external/imgui/imgui_tables.cpp
+    external/imgui/imgui_widgets.cpp
+    external/imgui/imgui_demo.cpp
+    external/imgui/backends/imgui_impl_glfw.cpp
+    external/imgui/backends/imgui_impl_opengl3.cpp
 )
 
 add_executable(DAMI WIN32
     ${SRC_FILES}
+    ${IMGUI_SRC}
 )
 
-target_include_directories(DAMI PRIVATE src)
-target_compile_definitions(DAMI PRIVATE UNICODE _UNICODE)
+target_include_directories(DAMI PRIVATE
+    src
+    src/config
+    external/imgui
+    external/imgui/backends
+)
 
 target_link_libraries(DAMI
-    windowsapp
+    glfw
+    opengl32
     winhttp
     ws2_32
-    Shell32
-    Comctl32
+    runtimeobject
+    windowsapp
 )
 
 if(DEFINED ENV{DISCORD_CLIENT_ID})
