@@ -11,11 +11,11 @@ static void _setup_header(void)
 {
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.949f, 0.961f, 0.980f, 1.0f));
     ImGui::SetWindowFontScale(1.25f);
-    ImGui::Text("DAMI");
+    ImGui::Text("Apple Music Integration");
     ImGui::SetWindowFontScale(1.0f);
     ImGui::PopStyleColor();
     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.612f, 0.647f, 0.714f, 1.0f));
-    ImGui::Text("Discord Apple Music Integration");
+    ImGui::Text("Settings");
     ImGui::PopStyleColor();
     ImGui::Spacing();
     ImGui::Separator();
@@ -31,7 +31,7 @@ void GUI::_setup_rp(void)
     ImGui::Checkbox("Show title", &_tmp_show_title);
     ImGui::Checkbox("Show artist", &_tmp_show_artist);
     ImGui::Checkbox("Show album", &_tmp_show_album);
-    ImGui::Checkbox("Show cover art", &_tmp_show_cover);
+    ImGui::Checkbox("Show cover image", &_tmp_show_cover);
     ImGui::Checkbox("Show timestamps", &_tmp_show_timestamps);
     ImGui::Spacing();
     ImGui::Separator();
@@ -44,7 +44,7 @@ void GUI::_setup_behavior(void)
     ImGui::Text("BEHAVIOR");
     ImGui::PopStyleColor();
     ImGui::Spacing();
-    ImGui::Checkbox("Start with Windows", &_tmp_auto_start);
+    ImGui::Checkbox("Run on startup", &_tmp_auto_start);
     ImGui::Spacing();
     ImGui::Spacing();
 }

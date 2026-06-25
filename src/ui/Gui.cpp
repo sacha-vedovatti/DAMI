@@ -74,7 +74,7 @@ void GUI::_run(void)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-    _window = glfwCreateWindow(480, 380, "DAMI – Settings", nullptr, nullptr);
+    _window = glfwCreateWindow(480, 380, "Discord Apple Music Integration", nullptr, nullptr);
     if (!_window) {
         glfwTerminate();
         return print_error("'glfwCreateWindow()' failed.");
@@ -94,7 +94,13 @@ void GUI::_setup(void)
     int height = 0;
     GLFWmonitor *monitor = glfwGetPrimaryMonitor();
     const GLFWvidmode *mode = glfwGetVideoMode(monitor);
+    // GLFWimage images[1];
 
+    // images[0].pixels = stbi_load("assets/DAMI.png", &images[0].width, &images[0].height, nullptr, 4);
+    // if (images[0].pixels) {
+    //     glfwSetWindowIcon(_window, 1, images);
+    //     stbi_image_free(images[0].pixels);
+    // }
     glfwGetMonitorPos(monitor, &x, &y);
     width = mode ? mode->width : 480;
     height = mode ? mode->height : 380;
