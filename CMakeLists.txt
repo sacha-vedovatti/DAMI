@@ -31,6 +31,7 @@ set(IMGUI_SRC
 add_executable(DAMI WIN32
     ${SRC_FILES}
     ${IMGUI_SRC}
+    assets/DAMI.rc
 )
 
 target_include_directories(DAMI PRIVATE
